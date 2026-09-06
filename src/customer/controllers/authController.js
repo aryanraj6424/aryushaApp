@@ -171,6 +171,113 @@ export const googleLogin = async (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
+| WhatsApp Direct Login / Signup (Customer)
+|--------------------------------------------------------------------------
+*/
+
+// Send WhatsApp Login OTP
+export const sendCustomerWhatsappOtp = async (req, res) => {
+  try {
+    const phoneInput = req.body.phone || req.body.phoneNumber;
+    console.log("📲 [SERVER WhatsApp Login] Incoming Send OTP Request payload:", { phoneInput });
+    const normalizedPhone = normalizePhoneNumber(phoneInput);
+
+    if (!normalizedPhone) {
+      console.warn("⚠️ [SERVER WhatsApp Login] Invalid phone number:", phoneInput);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid phone number. Please enter a valid 10-digit mobile number.",
+      });
+    }
+
+    const otp = generateRandomOtp();
+    console.log(`🔑 [SERVER WhatsApp Login] Generated OTP for ${normalizedPhone}: ${otp}`);
+    await sendWhatsappOtp(normalizedPhone, otp);
+    storeOtp("customer_whatsapp_login", normalizedPhone, otp);
+
+    console.log(`✅ [SERVER WhatsApp Login] OTP stored successfully in memory for ${normalizedPhone}`);
+    res.status(200).json({
+      success: true,
+      message: "WhatsApp OTP sent successfully.",
+    });
+  } catch (error) {
+    console.error("❌ [SERVER WhatsApp Login] sendCustomerWhatsappOtp Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send WhatsApp OTP.",
+    });
+  }
+};
+
+// Verify WhatsApp Login OTP and authenticate / create user
+export const verifyCustomerWhatsappOtp = async (req, res) => {
+  try {
+    const phoneInput = req.body.phone || req.body.phoneNumber;
+    const { otp } = req.body;
+    console.log("📲 [SERVER WhatsApp Login] Incoming Verify OTP Request payload:", { phoneInput, otp });
+
+    const normalizedPhone = normalizePhoneNumber(phoneInput);
+
+    if (!normalizedPhone || !otp) {
+      console.warn("⚠️ [SERVER WhatsApp Login] Missing phone or OTP:", { normalizedPhone, otp });
+      return res.status(400).json({
+        success: false,
+        message: "Phone number and OTP are required.",
+      });
+    }
+
+    const result = verifyOtpToken("customer_whatsapp_login", normalizedPhone, otp);
+    console.log("🔍 [SERVER WhatsApp Login] OTP Verification Result:", result);
+
+    if (!result.success) {
+      console.warn("⚠️ [SERVER WhatsApp Login] OTP Verification Failed:", result.message);
+      return res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
+    const raw10Digits = normalizedPhone.slice(2);
+    let user = await findAccountByPhone(User, "phoneNumber", normalizedPhone);
+
+    if (!user) {
+      console.log(`🆕 [SERVER WhatsApp Login] Creating new User account for phone: ${raw10Digits}`);
+      user = await User.create({
+        fullName: "WhatsApp User",
+        phoneNumber: raw10Digits,
+        isVerified: true,
+        provider: "whatsapp",
+      });
+    } else {
+      console.log(`👤 [SERVER WhatsApp Login] Existing User found: ${user._id} (${user.fullName})`);
+    }
+
+    // Generate real signed JWT token with user._id
+    const token = generateToken(user._id);
+    const sanitized = sanitizeUser(user);
+
+    console.log("🔑 [SERVER WhatsApp Login] Generated REAL JWT Token:", {
+      userId: user._id,
+      tokenSnippet: `${token.substring(0, 20)}... (length: ${token.length})`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "WhatsApp login successful",
+      user: sanitized,
+      token,
+    });
+  } catch (error) {
+    console.error("❌ [SERVER WhatsApp Login] verifyCustomerWhatsappOtp Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to verify WhatsApp OTP.",
+    });
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
 | Forgot Password - 3-Step WhatsApp OTP Flow (Customer)
 |--------------------------------------------------------------------------
 */
@@ -185,14 +292,6 @@ export const sendCustomerForgotPasswordOtp = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid phone number. Please enter a valid 10-digit mobile number.",
-      });
-    }
-
-    const user = await findAccountByPhone(User, "phoneNumber", normalizedPhone);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Customer account not found with this phone number.",
       });
     }
 
@@ -237,10 +336,25 @@ export const verifyCustomerForgotPasswordOtp = async (req, res) => {
       });
     }
 
+    const raw10Digits = normalizedPhone.slice(2);
+    let user = await findAccountByPhone(User, "phoneNumber", normalizedPhone);
+    if (!user) {
+      user = await User.create({
+        fullName: "WhatsApp User",
+        phoneNumber: raw10Digits,
+        isVerified: true,
+        provider: "whatsapp",
+      });
+    }
+
+    const token = generateToken(user._id);
+
     res.status(200).json({
       success: true,
       message: "OTP verified successfully.",
       resetToken: result.resetToken,
+      user: sanitizeUser(user),
+      token,
     });
   } catch (error) {
     console.error("verifyCustomerForgotPasswordOtp Error:", error);

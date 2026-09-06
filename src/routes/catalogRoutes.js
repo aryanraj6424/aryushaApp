@@ -109,7 +109,7 @@ router.put("/product-families/reject/:id", protectAdmin, rejectProductFamily);
 /* ─────────────────────────────────────────────
    Admin-only Product + Variant routes
 ───────────────────────────────────────────── */
-router.use(protectAdmin);
+router.use("/admin", protectAdmin);
 
 // Product CRUD
 router.get("/admin/product/all", getAllProducts);

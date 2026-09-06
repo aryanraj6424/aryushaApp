@@ -9,6 +9,8 @@ import {
   sendCustomerForgotPasswordOtp,
   verifyCustomerForgotPasswordOtp,
   resetCustomerPassword,
+  sendCustomerWhatsappOtp,
+  verifyCustomerWhatsappOtp,
   googleLogin,
   updateProfile,
 } from "../controllers/authController.js";
@@ -23,6 +25,10 @@ router.get("/test", (req, res) => {
 
 router.post("/signup", signup);
 router.post("/login", login);
+
+// WhatsApp Direct Login / Signup Routes
+router.post("/whatsapp/send-otp", sendCustomerWhatsappOtp);
+router.post("/whatsapp/verify-otp", verifyCustomerWhatsappOtp);
 
 // WhatsApp OTP 3-Step Forgot Password Routes
 router.post("/forgot-password/send-otp", sendCustomerForgotPasswordOtp);
