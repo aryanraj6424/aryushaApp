@@ -6,10 +6,23 @@ const bannerSchema = new mongoose.Schema(
       type: String,
       required: [true, "Banner image is required"],
     },
+    position: {
+      type: String,
+      enum: ["home_hero", "home_secondary"],
+      default: "home_hero",
+    },
+    title: {
+      type: String,
+      default: "",
+    },
+    bgColor: {
+      type: String,
+      default: "#F1F8E9",
+    },
     productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: [true, "A linked product is required for each banner"],
+      default: null,
     },
     productSlug: {
       type: String,
